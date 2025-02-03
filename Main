@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>消消乐小游戏</title>
+    <style>
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(8, 50px);
+            gap: 2px;
+            background: #333;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .tile {
+            width: 50px;
+            height: 50px;
+            background: #fff;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .tile:hover {
+            transform: scale(1.1);
+        }
+
+        .selected {
+            border: 3px solid yellow;
+        }
+
+        #score {
+            font-size: 24px;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">得分: 0</div>
+    <div id="game-board"></div>
+
+    <script>
+        const colors = ['#FF3366', '#33CC99', '#FF9933', '#9933FF', '#33CCFF'];
+        const boardSize = 8;
+        let selectedTile = null;
+        let score = 0;
+
+        // 创建游戏面板
+        function createBoard() {
+            const board = document.getElementById('game-board');
+            for (let i = 0; i < boardSize * boardSize; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.dataset.color = colors[Math.floor(Math.random() * colors.length)];
+                tile.style.backgroundColor = tile.dataset.color;
+                tile.addEventListener('click', handleTileClick);
+                board.appendChild(tile);
+            }
+        }
+
+        // 处理方块点击
+        function handleTileClick(e) {
+            const tile = e.target;
+            
+            if (!selectedTile) {
+                // 选择第一个方块
+                selectedTile = tile;
+                tile.classList.add('selected');
+            } else {
+                // 交换两个方块
+                if (areAdjacent(selectedTile, tile)) {
+                    swapTiles(selectedTile, tile);
+                    checkMatches();
+                    selectedTile.classList.remove('selected');
+                    selectedTile = null;
+                } else {
+                    selectedTile.classList.remove('selected');
+                    selectedTile = tile;
+                    tile.classList.add('selected');
+                }
+            }
+        }
+
+        // 检查是否相邻
+        function areAdjacent(tile1, tile2) {
+            const index1 = Array.from(tile1.parentNode.children).indexOf(tile1);
+            const index2 = Array.from(tile2.parentNode.children).indexOf(tile2);
+            const row1 = Math.floor(index1 / boardSize);
+            const col1 = index1 % boardSize;
+            const row2 = Math.floor(index2 / boardSize);
+            const col2 = index2 % boardSize;
+
+            return (Math.abs(row1 - row2) === 1 && col1 === col2) ||
+                   (Math.abs(col1 - col2) === 1 && row1 === row2);
+        }
+
+        // 交换方块
+        function swapTiles(tile1, tile2) {
+            const tempColor = tile1.dataset.color;
+            tile1.dataset.color = tile2.dataset.color;
+            tile2.dataset.color = tempColor;
+            tile1.style.backgroundColor = tile1.dataset.color;
+            tile2.style.backgroundColor = tile2.dataset.color;
+        }
+
+        // 检查匹配
+        function checkMatches() {
+            const tiles = document.getElementsByClassName('tile');
+            let matched = new Set();
+
+            // 横向检查
+            for (let row = 0; row < boardSize; row++) {
+                for (let col = 0; col < boardSize - 2; col++) {
+                    const index = row * boardSize + col;
+                    if (tiles[index].dataset.color === tiles[index + 1].dataset.color &&
+                        tiles[index].dataset.color === tiles[index + 2].dataset.color) {
+                        matched.add(index);
+                        matched.add(index + 1);
+                        matched.add(index + 2);
+                    }
+                }
+            }
+
+            // 纵向检查
+            for (let col = 0; col < boardSize; col++) {
+                for (let row = 0; row < boardSize - 2; row++) {
+                    const index = row * boardSize + col;
+                    if (tiles[index].dataset.color === tiles[index + boardSize].dataset.color &&
+                        tiles[index].dataset.color === tiles[index + boardSize * 2].dataset.color) {
+                        matched.add(index);
+                        matched.add(index + boardSize);
+                        matched.add(index + boardSize * 2);
+                    }
+                }
+            }
+
+            if (matched.size > 0) {
+                handleMatches(matched);
+                setTimeout(() => {
+                    dropTiles();
+                    checkMatches(); // 递归检查新的匹配
+                }, 500);
+            }
+        }
+
+        // 处理匹配消除
+        function handleMatches(matched) {
+            score += matched.size * 10;
+            document.getElementById('score').textContent = `得分: ${score}`;
+            
+            matched.forEach(index => {
+                const tile = document.getElementsByClassName('tile')[index];
+                tile.dataset.color = '';
+                tile.style.backgroundColor = '#fff';
+            });
+        }
+
+        // 下落新方块
+        function dropTiles() {
+            const tiles = document.getElementsByClassName('tile');
+            
+            for (let col = 0; col < boardSize; col++) {
+                let emptySpots = [];
+                for (let row = boardSize - 1; row >= 0; row--) {
+                    const index = row * boardSize + col;
+                    if (tiles[index].dataset.color === '') {
+                        emptySpots.push(index);
+                    } else if (emptySpots.length > 0) {
+                        const targetIndex = emptySpots.shift();
+                        tiles[targetIndex].dataset.color = tiles[index].dataset.color;
+                        tiles[targetIndex].style.backgroundColor = tiles[index].dataset.color;
+                        tiles[index].dataset.color = '';
+                        tiles[index].style.backgroundColor = '#fff';
+                        emptySpots.push(index);
+                    }
+                }
+                
+                // 填充顶部新方块
+                emptySpots.forEach(index => {
+                    tiles[index].dataset.color = colors[Math.floor(Math.random() * colors.length)];
+                    tiles[index].style.backgroundColor = tiles[index].dataset.color;
+                });
+            }
+        }
+
+        // 初始化游戏
+        createBoard();
+    </script>
+</body>
+</html>
