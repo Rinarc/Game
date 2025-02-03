@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>像素扫雷</title>
+    <style>
+        body {
+            background: #2b2b2b;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Press Start 2P', cursive;
+            margin: 0;
+            padding: 20px;
+        }
+
+        canvas {
+            border: 4px solid #535353;
+            image-rendering: pixelated;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        #ui {
+            color: #fff;
+            margin: 20px;
+            text-align: center;
+        }
+
+        .pixel-text {
+            font-size: 16px;
+            text-shadow: 2px 2px #000;
+        }
+
+        button {
+            background: #4a4a4a;
+            color: #fff;
+            border: 2px solid #fff;
+            padding: 8px 16px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #5a5a5a;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <p class="pixel-text" id="mines">剩余雷数: 10</p>
+        <button onclick="newGame()">新游戏</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const CELL_SIZE = 24;
+        const GRID_SIZE = 10;
+        const MINES = 10;
+        const COLORS = {
+            1: '#3466d8',
+            2: '#1b7e1b',
+            3: '#d82222',
+            4: '#0000a0',
+            5: '#8b0000',
+            6: '#008b8b',
+            7: '#000000',
+            8: '#696969'
+        };
+
+        let canvas, ctx;
+        let board = [];
+        let gameOver = false;
+        let minesLeft = MINES;
+
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = GRID_SIZE * CELL_SIZE;
+            canvas.height = GRID_SIZE * CELL_SIZE;
+            
+            canvas.addEventListener('click', handleLeftClick);
+            canvas.addEventListener('contextmenu', handleRightClick);
+            
+            newGame();
+        }
+
+        function newGame() {
+            gameOver = false;
+            minesLeft = MINES;
+            document.getElementById('mines').textContent = `剩余雷数: ${minesLeft}`;
+            generateBoard();
+            drawBoard();
+        }
+
+        function generateBoard() {
+            // 初始化棋盘
+            board = Array(GRID_SIZE).fill().map(() => 
+                Array(GRID_SIZE).fill().map(() => ({
+                    isMine: false,
+                    revealed: false,
+                    flagged: false,
+                    neighborMines: 0
+                }))
+            );
+
+            // 布置地雷
+            let minesPlaced = 0;
+            while (minesPlaced < MINES) {
+                const x = Math.floor(Math.random() * GRID_SIZE);
+                const y = Math.floor(Math.random() * GRID_SIZE);
+                if (!board[y][x].isMine) {
+                    board[y][x].isMine = true;
+                    minesPlaced++;
+                }
+            }
+
+            // 计算相邻雷数
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    if (!board[y][x].isMine) {
+                        board[y][x].neighborMines = countNeighborMines(x, y);
+                    }
+                }
+            }
+        }
+
+        function countNeighborMines(x, y) {
+            let count = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+                        if (board[ny][nx].isMine) count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const cell = board[y][x];
+                    ctx.save();
+                    ctx.translate(x * CELL_SIZE, y * CELL_SIZE);
+                    
+                    // 绘制单元格背景
+                    ctx.fillStyle = cell.revealed ? '#7b7b7b' : '#bdbdbd';
+                    ctx.fillRect(1, 1, CELL_SIZE-2, CELL_SIZE-2);
+                    
+                    // 绘制旗帜
+                    if (cell.flagged) {
+                        ctx.fillStyle = '#ff0000';
+                        drawPixelFlag();
+                    }
+                    
+                    // 绘制数字或地雷
+                    if (cell.revealed) {
+                        if (cell.isMine) {
+                            drawPixelMine();
+                        } else if (cell.neighborMines > 0) {
+                            drawPixelNumber(cell.neighborMines);
+                        }
+                    }
+                    
+                    ctx.restore();
+                }
+            }
+        }
+
+        function drawPixelMine() {
+            ctx.fillStyle = '#000';
+            // 绘制地雷中心
+            ctx.fillRect(8, 8, 8, 8);
+            // 绘制闪光效果
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(12, 4, 2, 2);
+            // 绘制阴影
+            ctx.fillStyle = '#444';
+            ctx.fillRect(6, 6, 2, 12);
+        }
+
+        function drawPixelNumber(num) {
+            ctx.fillStyle = COLORS[num];
+            ctx.font = '16px "Press Start 2P"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(num, CELL_SIZE/2, CELL_SIZE/2 + 2);
+        }
+
+        function drawPixelFlag() {
+            // 旗杆
+            ctx.fillStyle = '#444';
+            ctx.fillRect(10, 4, 2, 16);
+            // 旗帜
+            ctx.fillStyle = '#d00';
+            ctx.beginPath();
+            ctx.moveTo(12, 4);
+            ctx.lineTo(20, 8);
+            ctx.lineTo(12, 12);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function handleLeftClick(e) {
+            if (gameOver) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / CELL_SIZE);
+            const y = Math.floor((e.clientY - rect.top) / CELL_SIZE);
+            
+            if (board[y][x].flagged) return;
+            
+            if (board[y][x].isMine) {
+                gameOver = true;
+                revealAll();
+                animateExplosion(x, y);
+                return;
+            }
+            
+            revealCell(x, y);
+            checkWin();
+            drawBoard();
+        }
+
+        function handleRightClick(e) {
+            e.preventDefault();
+            if (gameOver) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / CELL_SIZE);
+            const y = Math.floor((e.clientY - rect.top) / CELL_SIZE);
+            
+            if (!board[y][x].revealed) {
+                board[y][x].flagged = !board[y][x].flagged;
+                minesLeft += board[y][x].flagged ? -1 : 1;
+                document.getElementById('mines').textContent = `剩余雷数: ${minesLeft}`;
+                drawBoard();
+            }
+        }
+
+        function revealCell(x, y) {
+            if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) return;
+            if (board[y][x].revealed || board[y][x].flagged) return;
+            
+            board[y][x].revealed = true;
+            
+            if (board[y][x].neighborMines === 0) {
+                // 自动展开空白区域
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        revealCell(x + dx, y + dy);
+                    }
+                }
+            }
+        }
+
+        function animateExplosion(x, y) {
+            const particles = [];
+            for (let i = 0; i < 20; i++) {
+                particles.push({
+                    x: x * CELL_SIZE + CELL_SIZE/2,
+                    y: y * CELL_SIZE + CELL_SIZE/2,
+                    dx: (Math.random() - 0.5) * 8,
+                    dy: (Math.random() - 0.5) * 8,
+                    life: 1
+                });
+            }
+
+            function animate() {
+                ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                particles.forEach(p => {
+                    p.x += p.dx;
+                    p.y += p.dy;
+                    p.dy += 0.5;
+                    p.life -= 0.02;
+                    
+                    ctx.fillStyle = `rgba(255,${Math.random()*100},0,${p.life})`;
+                    ctx.fillRect(p.x, p.y, 4, 4);
+                });
+                
+                if (particles.some(p => p.life > 0)) {
+                    requestAnimationFrame(animate);
+                } else {
+                    revealAll();
+                }
+            }
+            
+            animate();
+        }
+
+        function revealAll() {
+            board.forEach(row => row.forEach(cell => cell.revealed = true));
+            drawBoard();
+        }
+
+        function checkWin() {
+            let unrevealedSafe = 0;
+            board.forEach(row => row.forEach(cell => {
+                if (!cell.isMine && !cell.revealed) unrevealedSafe++;
+            }));
+            if (unrevealedSafe === 0) {
+                gameOver = true;
+                animateWin();
+            }
+        }
+
+        function animateWin() {
+            let angle = 0;
+            function animate() {
+                ctx.fillStyle = `hsl(${angle}, 100%, 50%)`;
+                ctx.globalCompositeOperation = 'overlay';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.globalCompositeOperation = 'source-over';
+                
+                angle = (angle + 2) % 360;
+                if (!gameOver) return;
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        // 初始化游戏
+        init();
+    </script>
+</body>
+</html>
